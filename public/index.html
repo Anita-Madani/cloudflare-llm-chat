@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cloudflare AI Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: #0f172a; color: #e5e7eb; display: flex; justify-content: center; }
+    .container { max-width: 720px; width: 100%; padding: 24px 16px 32px; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+    .subtitle { font-size: 0.9rem; color: #9ca3af; margin-bottom: 1rem; }
+    .chat-box { border-radius: 12px; border: 1px solid #1f2933; background: #020617; padding: 16px; height: 480px; overflow-y: auto; margin-bottom: 12px; }
+    .msg { margin-bottom: 10px; max-width: 85%; padding: 8px 10px; border-radius: 10px; font-size: 0.9rem; line-height: 1.3; white-space: pre-wrap; }
+    .msg.user { background: #1d4ed8; margin-left: auto; }
+    .msg.bot { background: #111827; margin-right: auto; border: 1px solid #1f2937; }
+    form { display: flex; gap: 8px; }
+    textarea { flex: 1; resize: none; border-radius: 12px; border: 1px solid #4b5563; padding: 10px; font-size: 0.9rem; background: #020617; color: #e5e7eb; }
+    button { border-radius: 12px; border: none; padding: 0 16px; font-size: 0.9rem; cursor: pointer; background: #22c55e; color: #022c22; font-weight: 600; }
+    button:disabled { opacity: 0.6; cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Cloudflare Edge Chat</h1>
+    <div class="subtitle">
+      Llama on Workers AI, memory with Durable Objects.
+    </div>
+
+    <div id="chat" class="chat-box"></div>
+
+    <form id="form">
+      <textarea id="input" rows="2" placeholder="Ask something..."></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById("chat");
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+
+    const sessionId = crypto.randomUUID();
+
+    function addMessage(text, role) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.textContent = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, "user");
+      input.value = "";
+      sendBtn.disabled = true;
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, message: text })
+        });
+
+        const data = await res.json();
+
+        if (data.reply) {
+          addMessage(data.reply, "bot");
+        } else if (data.error) {
+          addMessage("Error: " + data.error, "bot");
+        }
+      } catch (err) {
+        addMessage("Request failed", "bot");
+      } finally {
+        sendBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
